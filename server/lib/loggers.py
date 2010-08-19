@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# vim: set ts=4 sw=4 nowrap:
+# vim: set ts=8 sw=8 sts=8:
 import os
 import threading
 import socket

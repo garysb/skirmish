@@ -1,6 +1,6 @@
 #!/usr/bin/env python26
 # -*- coding: utf-8 -*-
-# vim: set ts=4 sw=4 nowrap:
+# vim: set ts=8 sw=8 sts=8:
 
 import sys
 
@@ -24,7 +24,7 @@ if __name__ == "__main__":
 	# Try set the name of the application so we can see it in ps
 	if sys.platform == 'linux2':
 		try:
-			libc											= ctypes.CDLL('libc.so.6')
+			libc = ctypes.CDLL('libc.so.6')
 			libc.prctl(15, 'skirmish', 0, 0, 0)
 		except:
 			pass
@@ -32,9 +32,9 @@ if __name__ == "__main__":
 	# Setup option parsing
 	import getopt
 	try:
-		short_opts											= 'hdc:'
-		long_opts											= ['help', 'daemon','config=']
-		opts, args											= getopt.getopt(sys.argv[1:], short_opts, long_opts)
+		short_opts = 'hdc:'
+		long_opts = ['help', 'daemon','config=']
+		opts, args = getopt.getopt(sys.argv[1:], short_opts, long_opts)
 	except getopt.GetoptError:
 		# print help information and exit:
 		usage()
@@ -50,11 +50,11 @@ if __name__ == "__main__":
 	for opt in opts:
 		if '-d' in opt[0] or '--daemon' in opt[0]:
 			from lib import daemon
-			ret_val											= daemon.set_daemon()
+			ret_val = daemon.set_daemon()
 			break
 
 	# Start our logging system
-	logger													= loggers.run_logger()
+	logger = loggers.run_logger()
 	loggers.log_queue.put({'type':'notice','source':'system','message':'Skirmish Server started on a '+sys.platform+' system'})
 	logger.start()
 
@@ -62,9 +62,10 @@ if __name__ == "__main__":
 	from lib import storage
 
 	# Start our controller system
-	control													= controller.Controller()
+	control = controller.Controller()
 	control.start()
 
 	# Join our child threads to the main thread
 	logger.join()
 	control.join()
+
