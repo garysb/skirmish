@@ -8,7 +8,7 @@ sys.path.append('../')
 # Import the libraries we require to run the server
 import ctypes
 from lib import daemon
-from lib import loggers
+from lib.logger import Logger
 from lib.control import Control
 from optparse import OptionParser
 from configparser import RawConfigParser
@@ -54,12 +54,14 @@ if __name__ == "__main__":
 	config = RawConfigParser()
 	config.read(options.config)
 
+	# TODO: Overwrite the logfile option in the configuration
+
 	# Start our logging system and add a message
-	logger = loggers.run_logger()
+	logger = Logger()
 	logger.start()
 
 	message = 'skirmish server started on a '+sys.platform+' system'
-	loggers.log_queue.put({'type':'notice','source':'system','message':message})
+	logger.queue.put({'type':'notice','source':'system','message':message})
 
 	# Import our data storage and connect to the storage system
 	from lib import storage

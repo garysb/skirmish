@@ -4,7 +4,6 @@ import sys
 import socket
 import threading
 import configparser
-from lib import loggers
 from lib import client
 
 class Control(threading.Thread):
@@ -50,7 +49,7 @@ class Control(threading.Thread):
 		except configparser.Error:
 			# Add an entry into the logs
 			message = 'error processing configuration options'
-			loggers.log_queue.put({'type':'error','source':'control','message':message})
+			logger.queue.put({'type':'error','source':'control','message':message})
 
 			# Report the error to the console and exit
 			print('Error starting connection controller system')
@@ -68,7 +67,7 @@ class Control(threading.Thread):
 		server_socket.listen(self.listen)
 		server_socket.settimeout(self.timeout)
 		message = 'connection control started'
-		loggers.log_queue.put({'type':'notice', 'source':'control', 'message':message})
+		logger.queue.put({'type':'notice', 'source':'control', 'message':message})
 
 		# Wait for a connection to be established
 		while Control.dismiss.isSet():
@@ -77,7 +76,7 @@ class Control(threading.Thread):
 				client_socket, address	= server_socket.accept()
 				client.Client(client_socket, address, self.bind_addr)
 				message = 'socket control started from '+address[0]
-				loggers.log_queue.put({'type':'notice', 'source':'control', 'message':message})
+				logger.queue.put({'type':'notice', 'source':'control', 'message':message})
 			except socket.timeout:
 				pass
 

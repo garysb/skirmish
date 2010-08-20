@@ -1,186 +1,218 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# vim: set ts=8 sw=8 sts=8:
-import os
+#!/usr/bin/env python3
+# vim: set ts=8 sw=8 sts=8 list nu:
 import threading
 import socket
-import string
 import time
-import Queue
-import ConfigParser
+from queue import Queue
+from queue import Empty as QueueEmpty
 
-protocol_version											= '1.00'
-log_queue													= Queue.Queue()
+# Define a public queue for modules to add to
+queue = Queue()
 
-class run_logger(threading.Thread):
-	""" The create_listerner class/thread creates a socket server to handle our
+class Logger(threading.Thread):
+	""" The Logger class/thread creates a socket server to handle our
 		connections from a client system. The sockets interact with the other
 		threads to execute commands on the system. To do this, it calls the
 		global method list defined within our daemon to decide which thread has
 		the method we are trying to call.
 	"""
-	dismiss													= threading.Event()
-	client_list												= []
-	client_lock												= threading.Lock()
+	# Create a dismisser and event locker (aka mutex)
+	dismiss = threading.Event()
+	client_list = []
+	client_lock = threading.Lock()
 
 	def __init__(self):
-		threading.Thread.__init__(self,None)
-		run_logger.dismiss.set()
+		# Initiate the threader and define the dismisser
+		threading.Thread.__init__(self, None)
+		Logger.dismiss.set()
 
-		global log_queue
-		log_queue											= Queue.Queue()
+		# Instantiate a module wide queue
+		global queue
+		queue = Queue()
 
-		# Parse our configuration options
-		config												= ConfigParser.ConfigParser()
-		config.read(['skirmish.conf', os.path.expanduser('~/.skirmish.conf')])
+		# Logger configuration options
 		try:
-			# Fetch the port we need to listen on
-			if config.has_option('logging', 'port'):
-				self.port									= int(config.get('logging','port'))
-			else:
-				self.port									= 3308
+			# Set the configuration section name
+			section = 'logger'
 
-			# Fetch the hostname to bind to
-			if config.has_option('logging', 'host'):
-				self.bind_addr								= config.get('logging','host')
-			else:
-				self.bind_addr								= 'localhost'
+			# Check if the config has the section we need
+			if not config.has_section(section):
+				# Add a logger section and the default values for it
+				config.add_section(section)
+				config.set(section, 'host', 'localhost')
+				config.set(section, 'port', 30406)
+				config.set(section, 'listen', 5)
+				config.set(section, 'timeout', 1)
+				config.set(section, 'logfile', 'skirmish.log')
 
-			# Fetch the logfile name
-			if config.has_option('logging', 'logfile'):
-				self.logfile								= config.get('logging','logfile')
-			else:
-				self.logfile								= 'skirmish.log'
+			# Store the configuration variables locally
+			self.host = config.get(section, 'host') if (config.has_option(section, 'host')) else ''
+			self.port = config.getint(section, 'port') if (config.has_option(section, 'port')) else 30406
+			self.listen = config.getint(section, 'listen') if (config.has_option(section, 'listen')) else 5
+			self.timeout = config.getint(section, 'timeout') if (config.has_option(section, 'timeout')) else 1
+			self.logfile = config.get(section, 'logfile') if (config.has_option(section, 'logfile')) else 'skirmish.log'
 
-			self.listen										= 5
-			self.timeout									= 0.5
-		except:
+		# An exception was thown
+		except configparser.Error:
+			# Add an entry into the logs
+			message = 'error processing configuration options'
+			queue.put({'type':'error','source':'logger','message':message})
+
+			# Report the error to the console and exit
 			print('Error starting logging system')
+			sys.exit(1)
 
 	def run(self):
-		# Create out file log thread
-		run_logger.client_lock.acquire()
-		file_client											= handle_file_log(self.logfile)
+		"""
+		Create two different types of logging systems. The first type
+		is a file logger that writes the log messages into a file
+		specified in the configuration file or from the console.
+		The second log type is a tcp socket that pushes log data
+		to a tcp port.
+		"""
+
+		# Create our file log thread
+		Logger.client_lock.acquire()
+		file_client = handle_filelog(self.logfile)
 		file_client.setName('fileThread')
-		run_logger.client_list.append(file_client)
-		run_logger.client_lock.release()
+		Logger.client_list.append(file_client)
+		Logger.client_lock.release()
 		file_client.start()
-		log_queue.put({'type':'notice','source':'logger','message':'File log started'})
-		# Bind the server to our socket
-		server_socket										= socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+		# Report that the file logger has started
+		message = 'file logging started'
+		queue.put({'type':'notice', 'source':'logger', 'message':message})
+
+		# Bind the logger tcp server to a socket
+		server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-		server_socket.bind((self.bind_addr, self.port))
+		server_socket.bind((self.host, self.port))
 		server_socket.listen(self.listen)
 		server_socket.settimeout(self.timeout)
-		# Wait for a connection to be established
-		while run_logger.dismiss.isSet():
+
+		# Wait for a tcp connection to be established
+		while Logger.dismiss.isSet():
 			try:
-				msg											= log_queue.get(block=False, timeout=False)
-				for client in run_logger.client_list:
+				msg = queue.get(block=False, timeout=False)
+				for client in Logger.client_list:
 					client.my_queue.put(msg)
-			except Queue.Empty:
+			except QueueEmpty:
 				pass
 
 			try:
 				# Wait for a connection from a client
-				client_socket, address						= server_socket.accept()
-				run_logger.client_lock.acquire()
-				new_client									= handle_connection(client_socket, address, self.bind_addr)
-				run_logger.client_list.append(new_client)
-				run_logger.client_lock.release()
+				client_socket, address = server_socket.accept()
+				Logger.client_lock.acquire()
+				new_client = handle_connection(client_socket, address, self.host)
+				Logger.client_list.append(new_client)
+				Logger.client_lock.release()
 				new_client.start()
-				log_queue.put({'type':'notice','source':'logger','message':'Socket log started from '+address[0]})
+				message = address[0]+' connected'
+				queue.put({'type':'notice', 'source':'logger', 'message':message})
 			except socket.timeout:
 				pass
 
 class handle_connection(threading.Thread):
-	""" This class implements a tcp log watcher.
+	""" When a client connects to the tcp logger, start a new thread to
+		handle the connection. The thread polls the log queue for any
+		new values.
 	"""
-	def __init__(self, client_socket, address, bind_addr):
+
+	def __init__(self, client_socket, address, host):
 		threading.Thread.__init__(self, None)
-		self.my_queue										= Queue.Queue()
-		self.client_socket									= client_socket
+		self.my_queue = Queue()
+		self.client_socket = client_socket
 		self.client_socket.settimeout(0.5)
-		self.address										= address
-		self.bind_addr										= bind_addr
+		self.address = address
+		self.host = host
 
 	def run(self):
-		#self.client_socket.setblocking(0)
+		# Send the connection welcome message to the client
 		self.client_socket.send(self.set_welcome())
+
+		# While a connection is active, loop through the log queue
 		while True:
+
+			# Try generate the output message and send it to the client
 			try:
-				raw_msg										= self.my_queue.get(True, 0.5)
-				if raw_msg:
-					msg										= '[%s] [%s] [%s] %s\n' % (time.asctime(), raw_msg['source'], raw_msg['type'], raw_msg['message'])
+				raw = self.my_queue.get(True, 0.5)
+				msg = '[{0}] [{1}] [{2}] {3}\n'.format(time.asctime(), raw['source'], raw['type'], raw['message'])
 				self.client_socket.send(msg)
-			except Queue.Empty:
-				try:
-					raw_data								= self.client_socket.recv(4096)
-				except:
-					continue
-				if raw_data:
-					data									= string.strip(raw_data)
-					if not data or data == 'quit': break
-					if data == 'clients':
-						self.client_socket.send(`run_logger.client_list`+'\n')
-						continue
-					self.client_socket.send(`list(data)`+'\n')
+
+			# No new items in the queue, just continue
+			except QueueEmpty:
+				continue
+
+			# An error raised due to no raw variable set
+			except NameError:
+				continue
+
+		# Shutdown the client tcp connection
 		self.client_socket.shutdown(2)
 		self.client_socket.close()
-		run_logger.client_lock.acquire()
-		run_logger.client_list.remove(self)
-		run_logger.client_lock.release()
-		global log_queue
-		log_queue.put({'type':'notice','source':'logger','message':'Socket log quit from '+self.address[0]})
+		Logger.client_lock.acquire()
+		Logger.client_list.remove(self)
+		Logger.client_lock.release()
+
+		# Report that the client has disconnected
+		global queue
+		message = self.address[0]+' disconnected'
+		queue.put({'type':'notice', 'source':'logger', 'message':message})
 
 	def set_welcome(self):
-		welcome												= '220 %s Skirmish logs %s; %s\n' % (self.bind_addr,protocol_version,time.asctime())
+		welcome = '220 {0} Skirmish logs; {1}\n'.format(self.bind_addr, time.asctime())
 		return welcome
 
-class handle_file_log(threading.Thread):
+class handle_filelog(threading.Thread):
 	""" The handle_file_log object/thread generates a filesystem log that adds
 		its queue messages into the filesystem.
 	"""
-	my_queue												= Queue.Queue()
+	my_queue = Queue()
 
 	def __init__(self, logfile='skirmish.log'):
 		threading.Thread.__init__(self, None)
-		self.logfile										= logfile
+		self.logfile = logfile
 
 	def run(self):
 		while True:
 			try:
-				raw_msg										= self.my_queue.get(True, 0.5)
-				if raw_msg:
-					msg										= '[%s] [%s] [%s] %s\n' % (time.asctime(), raw_msg['source'], raw_msg['type'], raw_msg['message'])
-					log_file								= open(self.logfile,'a')
-					log_file.write(msg)
-					log_file.close()
+				# Fetch the message from the queue
+				raw = self.my_queue.get(True, 0.5)
+				msg = '[{0}] [{1}] [{2}] {3}\n'.format(time.asctime(), raw['source'], raw['type'], raw['message'])
+
+				# Write the new message to the log file
+				log_file = open(self.logfile,'a')
+				log_file.write(msg)
+				log_file.close()
+
 			except Queue.Empty:
-				pass
+				continue
+
+			except NameError:
+				continue
 
 if __name__ == '__main__':
 	# Run some unit tests to check we have a working socket server
-	logger													= run_logger()
+	logger = Logger()
 	logger.start()
 
 	# Add some random test messages to the queue
 	time.sleep(3)
-	log_queue.put({'type':'notice','source':'logger','message':'Unit test 1'})
+	queue.put({'type':'notice','source':'logger','message':'Unit test 1'})
 	time.sleep(0.5)
-	log_queue.put({'type':'error','source':'logger','message':'Unit test 2'})
-	log_queue.put({'type':'notice','source':'logger','message':'Unit test 3'})
+	queue.put({'type':'error','source':'logger','message':'Unit test 2'})
+	queue.put({'type':'notice','source':'logger','message':'Unit test 3'})
 	time.sleep(2)
-	log_queue.put({'type':'warning','source':'logger','message':'Unit test 4'})
-	log_queue.put({'type':'notice','source':'logger','message':'Unit test 5'})
+	queue.put({'type':'warning','source':'logger','message':'Unit test 4'})
+	queue.put({'type':'notice','source':'logger','message':'Unit test 5'})
 	time.sleep(0.1)
-	log_queue.put({'type':'warning','source':'logger','message':'Unit test 6'})
+	queue.put({'type':'warning','source':'logger','message':'Unit test 6'})
 	time.sleep(0.1)
-	log_queue.put({'type':'notice','source':'logger','message':'Unit test 7'})
+	queue.put({'type':'notice','source':'logger','message':'Unit test 7'})
 	time.sleep(2)
-	log_queue.put({'type':'error','source':'logger','message':'Unit test 8'})
+	queue.put({'type':'error','source':'logger','message':'Unit test 8'})
 	time.sleep(1)
-	log_queue.put({'type':'notice','source':'logger','message':'Unit test 9'})
-	log_queue.put({'type':'notice','source':'logger','message':'Unit test 10'})
+	queue.put({'type':'notice','source':'logger','message':'Unit test 9'})
+	queue.put({'type':'notice','source':'logger','message':'Unit test 10'})
 
 	logger.join()
