@@ -83,6 +83,6 @@ class Control(threading.Thread):
 
 if __name__ == '__main__':
 	# Run some unit tests to check we have a working socket server
-	control						= Control()
+	control = Control()
 	control.start()
 	control.join()

@@ -24,8 +24,8 @@ def set_daemon():
 		# and inherits the parent's process group ID.  This step is required
 		# to insure that the next call to os.setsid is successful.
 		pid			= os.fork()
-	except OSError, e:
-		raise Exception, "%s [%d]" % (e.strerror, e.errno)
+	except OSError as e:
+		raise Exception("{0} [{1}]".format(e.strerror, e.errno))
 
 	if (pid == 0):
 		# To become the session leader of this new session and the process group
@@ -71,8 +71,8 @@ def set_daemon():
 			# longer a session leader, preventing the daemon from ever acquiring
 			# a controlling terminal.
 			pid		= os.fork()
-		except OSError, e:
-			raise Exception, "%s [%d]" % (e.strerror, e.errno)
+		except OSError as e:
+			raise Exception("{0} [{1}]".format(e.strerror, e.errno))
 
 		if (pid == 0):
 			# Since the current working directory may be a mounted filesystem, we
