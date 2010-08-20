@@ -1,25 +1,19 @@
-#!/usr/bin/env python26
-# -*- coding: utf-8 -*-
-# vim: set ts=8 sw=8 sts=8:
-
-import sys
+#!/usr/bin/env python3
+# vim: set ts=8 sw=8 sts=8 list nu:
 
 # Set the system path to include the parent directory
+import sys
 sys.path.append('../')
 
+# Import the libraries we require to run the server
 import ctypes
+from lib import daemon
 from lib import loggers
-from lib import controller
+from lib.control import Control
+from optparse import OptionParser
+from configparser import RawConfigParser
 
-def usage():
-	print('Usage: ./server [OPTION]...')
-	print('Start the skirmish server\n')
-	print('Options are any combination of the following:')
-	print('-c, --config=FILE\t\t(NOT IMPLEMENTED)Use the configuration file specified')
-	print('-d, --daemon\t\t\tRun the database in daemon mode')
-	print('-h, --help\t\t\tDisplay this help page')
-
-# If we are running this as a main thread, recreate as a daemon
+# If we are running this as a main thread, set name and parse cli options
 if __name__ == "__main__":
 	# Try set the name of the application so we can see it in ps
 	if sys.platform == 'linux2':
@@ -29,43 +23,51 @@ if __name__ == "__main__":
 		except:
 			pass
 
-	# Setup option parsing
-	import getopt
-	try:
-		short_opts = 'hdc:'
-		long_opts = ['help', 'daemon','config=']
-		opts, args = getopt.getopt(sys.argv[1:], short_opts, long_opts)
-	except getopt.GetoptError:
-		# print help information and exit:
-		usage()
-		sys.exit(2)
+	# TODO: Migrate this to use argparse when ubuntu catches up in 3.1
+	parser = OptionParser()
 
-	# FIXME: Should be using a lambda function map
-	for opt in opts:
-		if '-h' in opt[0] or '--help' in opt[0]:
-			usage()
-			sys.exit(0)
+	# Add our command line options
+	parser.add_option("-v", "--verbose",
+		action="store_true", dest="verbose", default=False,
+		help="display additional information [default]")
 
-	# FIXME: Should be using a lambda function map
-	for opt in opts:
-		if '-d' in opt[0] or '--daemon' in opt[0]:
-			from lib import daemon
-			ret_val = daemon.set_daemon()
-			break
+	parser.add_option("-d", "--daemon",
+		action="store_true", dest="daemonize", default=False,
+		help="Run in the background [default]")
 
-	# Start our logging system
+	parser.add_option("-c", "--config",
+		dest="config", default="skirmish.conf",
+		metavar="FILE", help="load configuration from FILE")
+
+	parser.add_option("-l", "--log",
+		dest="log", default="skirmish.log",
+		metavar="FILE", help="log actions to FILE")
+
+	# Process the command line options
+	(options, args) = parser.parse_args()
+
+	# Check if the server should be run in daemon mode
+	if options.daemonize:
+		result = daemon.set_daemon()
+
+	# Process any configuration options
+	config = RawConfigParser()
+	config.read(options.config)
+
+	# Start our logging system and add a message
 	logger = loggers.run_logger()
-	loggers.log_queue.put({'type':'notice','source':'system','message':'Skirmish Server started on a '+sys.platform+' system'})
 	logger.start()
 
-	# Start our storage system up
+	message = 'skirmish server started on a '+sys.platform+' system'
+	loggers.log_queue.put({'type':'notice','source':'system','message':message})
+
+	# Import our data storage and connect to the storage system
 	from lib import storage
 
-	# Start our controller system
-	control = controller.Controller()
+	# Start our connection controller system
+	control = Control()
 	control.start()
 
 	# Join our child threads to the main thread
 	logger.join()
 	control.join()
-

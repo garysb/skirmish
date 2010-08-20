@@ -1,19 +1,17 @@
-# -*- coding: utf-8 -*-
-# vim: set ts=4 sw=4 nowrap:
-# Create a daemon out of our main thread. This module doesnt have any unit test
-# because we wouldnt be able to test it.
+# Convert the main thread into a daemon
+# vim: set ts=8 sw=8 sts=8 list nu:
 import os
 
 # Default daemon parameters.
-UMASK														= 0
-WORKDIR														= "/"
-MAXFD														= 1024
+UMASK					= 0
+WORKDIR					= "/"
+MAXFD					= 1024
 
 # The standard I/O file descriptors are redirected to /dev/null by default.
 if (hasattr(os, "devnull")):
-	REDIRECT_TO												= os.devnull
+	REDIRECT_TO			= os.devnull
 else:
-	REDIRECT_TO												= "/dev/null"
+	REDIRECT_TO			= "/dev/null"
 
 def set_daemon():
 	"""Detach a process from the controlling terminal and run it in the
@@ -25,7 +23,7 @@ def set_daemon():
 		# be a process group leader, since the child receives a new process ID
 		# and inherits the parent's process group ID.  This step is required
 		# to insure that the next call to os.setsid is successful.
-		pid													= os.fork()
+		pid			= os.fork()
 	except OSError, e:
 		raise Exception, "%s [%d]" % (e.strerror, e.errno)
 
@@ -72,7 +70,7 @@ def set_daemon():
 			# based systems).  This second fork guarantees that the child is no
 			# longer a session leader, preventing the daemon from ever acquiring
 			# a controlling terminal.
-			pid												= os.fork()
+			pid		= os.fork()
 		except OSError, e:
 			raise Exception, "%s [%d]" % (e.strerror, e.errno)
 
@@ -124,9 +122,9 @@ def set_daemon():
 	# resource, use the default value.
 	#
 	import resource
-	maxfd													= resource.getrlimit(resource.RLIMIT_NOFILE)[1]
+	maxfd				= resource.getrlimit(resource.RLIMIT_NOFILE)[1]
 	if (maxfd == resource.RLIM_INFINITY):
-		maxfd												= MAXFD
+		maxfd			= MAXFD
 
 	# Iterate through and close all file descriptors.
 	for fd in range(0, maxfd):
