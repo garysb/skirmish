@@ -63,7 +63,7 @@ class Control(threading.Thread):
 		# Bind the server to our socket
 		server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-		server_socket.bind((self.bind_addr, self.port))
+		server_socket.bind((self.host, self.port))
 		server_socket.listen(self.listen)
 		server_socket.settimeout(self.timeout)
 		message = 'connection control started'
@@ -74,7 +74,7 @@ class Control(threading.Thread):
 			try:
 				# Wait for a connection from a client
 				client_socket, address	= server_socket.accept()
-				Client(client_socket, address, self.bind_addr)
+				Client(client_socket, address, self.host)
 				message = 'socket control started from '+address[0]
 				logger.queue.put({'type':'notice', 'source':'control', 'message':message})
 			except socket.timeout:
