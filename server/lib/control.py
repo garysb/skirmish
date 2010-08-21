@@ -4,7 +4,7 @@ import sys
 import socket
 import threading
 import configparser
-from lib import client
+from lib.client import Client
 
 class Control(threading.Thread):
 	""" The control class/thread creates a socket server to handle our
@@ -49,7 +49,7 @@ class Control(threading.Thread):
 		except configparser.Error:
 			# Add an entry into the logs
 			message = 'error processing configuration options'
-			logger.queue.put({'type':'error','source':'control','message':message})
+			logger.queue.put({'type':'error', 'source':'control', 'message':message})
 
 			# Report the error to the console and exit
 			print('Error starting connection controller system')
@@ -74,7 +74,7 @@ class Control(threading.Thread):
 			try:
 				# Wait for a connection from a client
 				client_socket, address	= server_socket.accept()
-				client.Client(client_socket, address, self.bind_addr)
+				Client(client_socket, address, self.bind_addr)
 				message = 'socket control started from '+address[0]
 				logger.queue.put({'type':'notice', 'source':'control', 'message':message})
 			except socket.timeout:

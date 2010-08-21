@@ -1,14 +1,13 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# vim: set ts=4 sw=4 nowrap:
+# vim: set ts=8 sw=8 sts=8 list nu:
+
+# Import required modules
 import sys
 import time
 import protocol
 import threading
-import Queue as queue
-from lib import user
+import queue
+from lib.user import User
 from lib.stack import stack
-from lib import loggers
 
 class Client(threading.Thread):
 	""" For  each client connection, we create a thread to handle any commands.
@@ -16,16 +15,16 @@ class Client(threading.Thread):
 	"""
 	def __init__(self, socket, address, bind):
 		threading.Thread.__init__(self, None)
-		self.socket											= socket
-		self.address										= address
-		self.bind											= bind
-		self.version										= '1.00'
-		self.block											= False
-		self.wait											= 1
-		self.more											= True
+		self.socket				= socket
+		self.address				= address
+		self.bind				= bind
+		self.version				= '1.00'
+		self.block				= False
+		self.wait				= 1
+		self.more				= True
 
 		# Object types
-		self.user											= None
+		self.user				= None
 
 		# Start running the thread
 		self.start()
@@ -43,11 +42,12 @@ class Client(threading.Thread):
 		stack.add('clients',self.ident)
 
 		try:
-			loggers.log_queue.put({'type':'notice','source':'client','message':'Client thread %s started' % str(self.ident)})
+			message = 'client thread {0} started'.format(self.ident)
+			logger.queue.put({'type':'notice', 'source':'client', 'message':message)
 		except ZeroDivisionError:
 			pass
 		else:
-			#self.user											= user.User(self.ident)
+			#self.user			= user.User(self.ident)
 
 			# Begin our main loop
 			self.process()
@@ -56,7 +56,8 @@ class Client(threading.Thread):
 			self.socket.shutdown(2)
 			self.socket.close()
 			stack.remove('clients',self.ident)
-			loggers.log_queue.put({'type':'notice','source':'client','message':'Socket control quit from '+self.address[0]})
+			message = 'socket control quit from {0}'.format(self.address[0])
+			logger.queue.put({'type':'notice', 'source':'client', 'message':message})
 			return
 
 	def put(self, data):
@@ -66,7 +67,8 @@ class Client(threading.Thread):
 			The client must check this value to ensure that they fetch all the information from the
 			servers buffer.
 		"""
-		loggers.log_queue.put({'type':'notice','source':'control','message':'send: '+str(data)})
+		message = 'send: {0}'.format(data)
+		logger.queue.put({'type':'notice', 'source':'control', 'message':message})
 		self.socket.send(protocol.encryption.encrypt(data))
 
 	def get(self):
@@ -77,17 +79,18 @@ class Client(threading.Thread):
 		"""
 
 		# Fetch the packet size from the first 32 bytes of data.
-		data_length											= int(self.socket.recv(32))
-		output												= ''
+		data_length				= int(self.socket.recv(32))
+		output					= ''
 
 		# Loop through sockets reads until we have all the data.
 		while data_length >= 1:
-			data											= self.socket.recv(8192)
-			data_length										= data_length - int(data.__len__())
-			output											= output + data
+			data				= self.socket.recv(8192)
+			data_length			= data_length - int(data.__len__())
+			output				= output + data
 
 		# return the data to the calling method
-		loggers.log_queue.put({'type':'notice','source':'control','message':'read: '+str(output)})
+		message = 'read: {0}'.format(output)
+		logger.queue.put({'type':'notice', 'source':'control', 'message':message})
 		return protocol.encryption.decrypt(output)
 
 	def process(self, data):
@@ -99,7 +102,7 @@ class Client(threading.Thread):
 		while self.more:
 			# Read any data we can from the client
 			try:
-				data										= self.get()
+				data			= self.get()
 			except:
 				continue
 			else:
@@ -115,13 +118,13 @@ class Client(threading.Thread):
 
 			# Check if there is a packet to be sent to the client
 			try:
-				data										= stack['clients'][self.ident].get(self.block,self.wait)
+				data			= stack['clients'][self.ident].get(self.block,self.wait)
 			except queue.Empty:
-				data										= {'type':'0x000','action':'0x00','status':'0x000'}
+				data			= {'type':'0x000','action':'0x00','status':'0x000'}
 			finally:
 				self.put(data)
-				self.block									= False
-				self.wait									= 1
+				self.block		= False
+				self.wait		= 1
 
 	def respond(self,data):
 		""" The respond method is for actions targeted at the handler itself. It
@@ -136,7 +139,7 @@ class Client(threading.Thread):
 			stack['clients'][self.ident].put(5,{'type':'0x000','action':'0x20','status':'0x000','version':self.version,'address':self.bind,'time':time.asctime()})
 		elif data['action'] == '0x30':
 			# Close the connection to the client and quit the thread
-			self.more										= False
+			self.more			= False
 		elif data['action'] == '0x40':
 			# Respond to the client with the ping packet
 			stack['clients'][self.ident].put(1,{'type':'0x000','status':'0x000','action':'0x40','hash':data['hash']})

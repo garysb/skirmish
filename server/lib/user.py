@@ -1,15 +1,10 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# vim: set ts=4 sw=4 nowrap:
-import sys
-sys.path.append('../')
+# vim: set ts=8 sw=8 sts=8 list nu:
+
+# Import the required modules
 import time
 import datetime
 import threading
-import Queue as queue
-from lib.stack import stack
-from lib import storage
-from lib import loggers
+import queue
 
 class User(threading.Thread):
 	""" The user object is used to keep track of user connection information.
@@ -18,22 +13,21 @@ class User(threading.Thread):
 	"""
 
 	# Object data generated, set, or passed in from parent
-	db														= None
-	block													= False
-	wait													= 1
-	more													= True
-	client_ident											= None
-	authenticated											= False
+	block					= False
+	wait					= 1
+	more					= True
+	client_ident				= None
+	authenticated				= False
 
 	# User data retrieved from the database
-	u_id													= None
-	username												= None
-	password												= None
-	forename												= None
-	surname													= None
-	expired													= False
-	disabled												= False
-	banned													= False
+	u_id					= None
+	username				= None
+	password				= None
+	forename				= None
+	surname					= None
+	expired					= False
+	disabled				= False
+	banned					= False
 
 	def __init__(self, client_ident):
 		""" Initialise the object by creating a new thread. We also store the
@@ -41,7 +35,7 @@ class User(threading.Thread):
 			used to send data to the client.
 		"""
 		threading.Thread.__init__(self, None)
-		self.client_ident									= client_ident
+		self.client_ident		= client_ident
 		self.start()
 
 	def run(self):
@@ -51,23 +45,23 @@ class User(threading.Thread):
 			so we can prioritise messages. Then we run our main queue loop to
 			process data we recieve in the queue.
 		"""
-		loggers.log_queue.put({'type':'notice','source':'user','message':'User thread %s started' % str(self.ident)})
-		self.db												= storage.db
+		message = 'user thread {0} started'.format(self.ident)
+		logger.queue.put({'type':'notice', 'source':'user', 'message':message})
 		stack.add('users',self.ident)
 
 		# Run our main loop to process messages in the message queue
 		while self.more:
 			# Check if there is a packet to process
 			try:
-				data										= stack['users'][self.ident].get(self.block,self.wait)
+				data		= stack['users'][self.ident].get(self.block,self.wait)
 			except queue.Empty:
 				pass
 			else:
 				self.process(data)
 			finally:
 				# Reset our queue parser to its default values
-				self.block									= False
-				self.wait									= 1
+				self.block	= False
+				self.wait	= 1
 
 		# When the run loop is broken, clean up any queues and data we have
 		stack.remove('users',self.ident)
@@ -86,23 +80,23 @@ class User(threading.Thread):
 		# Authenticate the user
 		try:
 			# Get the results from the database and store them in the user object
-			result											= self.db.login(data['username'], data['password'])
+			result			= storage.login(data['username'], data['password'])
 
 			# Sort out the expiry date to check if the user has expired
-			expires											= self.db.get_datetime(result['u_expiry'])
-			now												= datetime.datetime.now()
+			expires			= storage.get_datetime(result['u_expiry'])
+			now			= datetime.datetime.now()
 		except:
-			self.authenticated								= False
+			self.authenticated	= False
 		else:
-			self.u_id										= result['u_id']
-			self.username									= result['u_username']
-			self.password									= result['u_password']
-			self.forename									= result['u_forename']
-			self.surname									= result['u_surname']
-			self.disabled									= result['u_disabled']
-			self.banned										= result['u_banned']
-			self.expired									= True if now < expires else False
-			self.authenticated								= True
+			self.u_id		= result['u_id']
+			self.username		= result['u_username']
+			self.password		= result['u_password']
+			self.forename		= result['u_forename']
+			self.surname		= result['u_surname']
+			self.disabled		= result['u_disabled']
+			self.banned		= result['u_banned']
+			self.expired		= True if now < expires else False
+			self.authenticated	= True
 		finally:
 			# Check we have a valid user
 			if not self.authenticated:

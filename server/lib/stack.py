@@ -1,19 +1,21 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# vim: set ts=4 sw=4 nowrap:
-import Queue as queue
-from lib import loggers
+# vim: set ts=8 sw=8 sts=8 list nu:
+
+# Import the PriorityQueue
+from queue import PriorityQueue
 
 class Stack(dict):
 	def __init__(self):
 		""" When the stack is initialised, report this to the logger """
-		loggers.log_queue.put({'type':'notice','source':'stack','message':"Initialised stack controller"})
+		message = 'initialized stack controller'
+		logger.queue.put({'type':'notice', 'source':'stack', 'message':message})
 
 	def __missing__(self, k):
 		""" When we try access a missing item in the stack, report the problem
 			to the logger, then raise a KeyError.
 		"""
-		loggers.log_queue.put({'type':'warning','source':'stack','message':"Missing stack queue %s" % k})
+		message = 'missing stack queue {0}'.format(k)
+		logger.queue.put({'type':'warning', 'source':'stack', 'message':message})
 		self.create(k)
 
 	def create(self, key):
@@ -22,7 +24,8 @@ class Stack(dict):
 			stack will be used to store multiple entries, one for each type of
 			item we define. eg. user, avatar, scene, ...
 		"""
-		loggers.log_queue.put({'type':'notice','source':'stack','message':"Creating stack queue %s" % key})
+		message = 'creating stack queue {0}'.format(key)
+		logger.queue.put({'type':'notice', 'source':'stack', 'message':message})
 		if key not in self:
 			self[key] = {}
 
@@ -31,7 +34,8 @@ class Stack(dict):
 			stack is empty by checking the stack count. If not empty, we raise
 			an exception to get reported to the client.
 		"""
-		loggers.log_queue.put({'type':'notice','source':'stack','message':"Destroying stack queue %s" % key})
+		message = 'destroying stack queue {0}'.format(key)
+		logger.queue.put({'type':'notice', 'source':'stack', 'message':message})
 		if key in self:
 			# FIXME: Need to check if its empty first
 			self.__delitem__(key)
@@ -41,14 +45,15 @@ class Stack(dict):
 			that item to read off. Note that we dont create stacks to be used
 			as output stacks, only input stacks.
 		"""
-		loggers.log_queue.put({'type':'notice','source':'stack','message':"Adding stack queue %s to %s" % (identity,key)})
-		self[key].__setitem__(str(identity),queue.PriorityQueue(maximum))
+		message = 'adding stack {0} to {1}'.format(identity, key)
+		logger.queue.put({'type':'notice', 'source':'stack', 'message':message})
+		self[key].__setitem__(str(identity), PriorityQueue(maximum))
 
 	def remove(self, key, identity):
 		""" Remove an item from the stack. This happens when a client closes a
 			connection to the server, or changes their avatar.
 		"""
-		loggers.log_queue.put({'type':'notice','source':'stack','message':"Removing stack queue %s from %s" % (identity,key)})
+		message = 'removing stack queue {0} from {1}'.format(identity, key)
+		logger.queue.put({'type':'notice', 'source':'stack', 'message':message})
 		self[key].__delitem__(str(identity))
 
-stack = Stack()

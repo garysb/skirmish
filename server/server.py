@@ -7,9 +7,11 @@ sys.path.append('../')
 
 # Import the libraries we require to run the server
 import ctypes
-from lib import daemon
+from lib.stack import Stack
+from lib.daemon import Daemon
 from lib.logger import Logger
 from lib.control import Control
+from lib.storage import Storage
 from optparse import OptionParser
 from configparser import RawConfigParser
 
@@ -48,7 +50,7 @@ if __name__ == "__main__":
 
 	# Check if the server should be run in daemon mode
 	if options.daemonize:
-		result = daemon.set_daemon()
+		result = Daemon()
 
 	# Process any configuration options
 	config = RawConfigParser()
@@ -63,8 +65,11 @@ if __name__ == "__main__":
 	message = 'skirmish server started on a '+sys.platform+' system'
 	logger.queue.put({'type':'notice','source':'system','message':message})
 
+	# Create the stack manager
+	stack = Stack()
+
 	# Import our data storage and connect to the storage system
-	from lib import storage
+	storage = Storage()
 
 	# Start our connection controller system
 	control = Control()
