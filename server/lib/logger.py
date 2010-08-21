@@ -6,9 +6,6 @@ import time
 from queue import Queue
 from queue import Empty as QueueEmpty
 
-# Define a public queue for modules to add to
-queue = Queue()
-
 class Logger(threading.Thread):
 	""" The Logger class/thread creates a socket server to handle our
 		connections from a client system. The sockets interact with the other
@@ -27,8 +24,7 @@ class Logger(threading.Thread):
 		Logger.dismiss.set()
 
 		# Instantiate a module wide queue
-		global queue
-		queue = Queue()
+		self.queue = Queue()
 
 		# Logger configuration options
 		try:
@@ -56,7 +52,7 @@ class Logger(threading.Thread):
 		except configparser.Error:
 			# Add an entry into the logs
 			message = 'error processing configuration options'
-			queue.put({'type':'error','source':'logger','message':message})
+			self.queue.put({'type':'error','source':'logger','message':message})
 
 			# Report the error to the console and exit
 			print('Error starting logging system')
@@ -81,7 +77,7 @@ class Logger(threading.Thread):
 
 		# Report that the file logger has started
 		message = 'file logging started'
-		queue.put({'type':'notice', 'source':'logger', 'message':message})
+		self.queue.put({'type':'notice', 'source':'logger', 'message':message})
 
 		# Bind the logger tcp server to a socket
 		server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -93,9 +89,9 @@ class Logger(threading.Thread):
 		# Wait for a tcp connection to be established
 		while Logger.dismiss.isSet():
 			try:
-				msg = queue.get(block=False, timeout=False)
+				msg = self.queue.get(block=False, timeout=False)
 				for client in Logger.client_list:
-					client.my_queue.put(msg)
+					client.queue.put(msg)
 			except QueueEmpty:
 				pass
 
@@ -108,7 +104,7 @@ class Logger(threading.Thread):
 				Logger.client_lock.release()
 				new_client.start()
 				message = address[0]+' connected'
-				queue.put({'type':'notice', 'source':'logger', 'message':message})
+				self.queue.put({'type':'notice', 'source':'logger', 'message':message})
 			except socket.timeout:
 				pass
 
@@ -120,7 +116,7 @@ class handle_connection(threading.Thread):
 
 	def __init__(self, client_socket, address, host):
 		threading.Thread.__init__(self, None)
-		self.my_queue = Queue()
+		self.queue = Queue()
 		self.client_socket = client_socket
 		self.client_socket.settimeout(0.5)
 		self.address = address
@@ -135,7 +131,7 @@ class handle_connection(threading.Thread):
 
 			# Try generate the output message and send it to the client
 			try:
-				raw = self.my_queue.get(True, 0.5)
+				raw = self.queue.get(True, 0.5)
 				msg = '[{0}] [{1}] [{2}] {3}\n'.format(time.asctime(), raw['source'], raw['type'], raw['message'])
 				self.client_socket.send(msg)
 
@@ -155,9 +151,8 @@ class handle_connection(threading.Thread):
 		Logger.client_lock.release()
 
 		# Report that the client has disconnected
-		global queue
 		message = self.address[0]+' disconnected'
-		queue.put({'type':'notice', 'source':'logger', 'message':message})
+		logger.queue.put({'type':'notice', 'source':'logger', 'message':message})
 
 	def set_welcome(self):
 		welcome = '220 {0} Skirmish logs; {1}\n'.format(self.bind_addr, time.asctime())
@@ -167,7 +162,7 @@ class handle_filelog(threading.Thread):
 	""" The handle_file_log object/thread generates a filesystem log that adds
 		its queue messages into the filesystem.
 	"""
-	my_queue = Queue()
+	queue = Queue()
 
 	def __init__(self, logfile='skirmish.log'):
 		threading.Thread.__init__(self, None)
@@ -177,7 +172,7 @@ class handle_filelog(threading.Thread):
 		while True:
 			try:
 				# Fetch the message from the queue
-				raw = self.my_queue.get(True, 0.5)
+				raw = self.queue.get(True, 0.5)
 				msg = '[{0}] [{1}] [{2}] {3}\n'.format(time.asctime(), raw['source'], raw['type'], raw['message'])
 
 				# Write the new message to the log file
@@ -198,21 +193,21 @@ if __name__ == '__main__':
 
 	# Add some random test messages to the queue
 	time.sleep(3)
-	queue.put({'type':'notice','source':'logger','message':'Unit test 1'})
+	logger.queue.put({'type':'notice','source':'logger','message':'Unit test 1'})
 	time.sleep(0.5)
-	queue.put({'type':'error','source':'logger','message':'Unit test 2'})
-	queue.put({'type':'notice','source':'logger','message':'Unit test 3'})
+	logger.queue.put({'type':'error','source':'logger','message':'Unit test 2'})
+	logger.queue.put({'type':'notice','source':'logger','message':'Unit test 3'})
 	time.sleep(2)
-	queue.put({'type':'warning','source':'logger','message':'Unit test 4'})
-	queue.put({'type':'notice','source':'logger','message':'Unit test 5'})
+	logger.queue.put({'type':'warning','source':'logger','message':'Unit test 4'})
+	logger.queue.put({'type':'notice','source':'logger','message':'Unit test 5'})
 	time.sleep(0.1)
-	queue.put({'type':'warning','source':'logger','message':'Unit test 6'})
+	logger.queue.put({'type':'warning','source':'logger','message':'Unit test 6'})
 	time.sleep(0.1)
-	queue.put({'type':'notice','source':'logger','message':'Unit test 7'})
+	logger.queue.put({'type':'notice','source':'logger','message':'Unit test 7'})
 	time.sleep(2)
-	queue.put({'type':'error','source':'logger','message':'Unit test 8'})
+	logger.queue.put({'type':'error','source':'logger','message':'Unit test 8'})
 	time.sleep(1)
-	queue.put({'type':'notice','source':'logger','message':'Unit test 9'})
-	queue.put({'type':'notice','source':'logger','message':'Unit test 10'})
+	logger.queue.put({'type':'notice','source':'logger','message':'Unit test 9'})
+	logger.queue.put({'type':'notice','source':'logger','message':'Unit test 10'})
 
 	logger.join()
