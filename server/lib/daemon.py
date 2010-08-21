@@ -2,7 +2,7 @@
 # vim: set ts=8 sw=8 sts=8 list nu:
 import os
 
-class Daemon
+class Daemon:
 	# Default daemon parameters.
 	umask					= 0
 	workdir					= "/"

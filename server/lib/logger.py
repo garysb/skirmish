@@ -185,7 +185,7 @@ class handle_filelog(threading.Thread):
 				log_file.write(msg)
 				log_file.close()
 
-			except Queue.Empty:
+			except QueueEmpty:
 				continue
 
 			except NameError:

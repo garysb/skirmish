@@ -3,10 +3,11 @@
 
 # Set the system path to include the parent directory
 import sys
-sys.path.append('../')
+sys.path.append('..')
 
 # Import the libraries we require to run the server
 import ctypes
+import builtins
 from lib.stack import Stack
 from lib.daemon import Daemon
 from lib.logger import Logger
@@ -53,23 +54,23 @@ if __name__ == "__main__":
 		result = Daemon()
 
 	# Process any configuration options
-	config = RawConfigParser()
+	builtins.config = RawConfigParser()
 	config.read(options.config)
 
 	# TODO: Overwrite the logfile option in the configuration
 
 	# Start our logging system and add a message
-	logger = Logger()
+	builtins.logger = Logger()
 	logger.start()
 
 	message = 'skirmish server started on a '+sys.platform+' system'
 	logger.queue.put({'type':'notice','source':'system','message':message})
 
 	# Create the stack manager
-	stack = Stack()
+	builtins.stack = Stack()
 
 	# Import our data storage and connect to the storage system
-	storage = Storage()
+	builtins.storage = Storage()
 
 	# Start our connection controller system
 	control = Control()

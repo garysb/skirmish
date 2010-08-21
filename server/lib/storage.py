@@ -43,8 +43,7 @@ class Storage(object):
 		else:
 			# Create the database if it doesnt exist
 			if not os.path.isfile(self.data):
-
-
+				print('Create')
 
 	def close(self):
 		print('close')

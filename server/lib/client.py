@@ -7,7 +7,6 @@ import protocol
 import threading
 import queue
 from lib.user import User
-from lib.stack import stack
 
 class Client(threading.Thread):
 	""" For  each client connection, we create a thread to handle any commands.
@@ -43,7 +42,7 @@ class Client(threading.Thread):
 
 		try:
 			message = 'client thread {0} started'.format(self.ident)
-			logger.queue.put({'type':'notice', 'source':'client', 'message':message)
+			logger.queue.put({'type':'notice', 'source':'client', 'message':message})
 		except ZeroDivisionError:
 			pass
 		else:
